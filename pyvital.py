@@ -1,18 +1,28 @@
 import serial
 import time
 import numpy as np
+import struct
 import pyqtgraph as pg
 from pyqtgraph.Qt import QtGui
 
+global CLIport, Dataport
 CLIport = {}
 Dataport = {}
 byteBuffer = np.zeros(2**15,dtype = 'uint8')
 byteBufferLength = 0;
+dataBin = [None] * 288
+magicWord = b'\x02\x01\x04\x03\x06\x05\x08\x07'
+print(magicWord)
+# Byte sizes for different values
+magicWord  = 8
+fftOrPeak  = 4
+# ------------------------------------------------------------------
+
 
 def serialConfig(configFileName, dataPortName, userPortName):
     try:
         cliPort = serial.Serial(userPortName, 115200)
-        dataPort = serial.Serial(dataPortName, 921600)
+        dataPort = serial.Serial(dataPortName, 921600,timeout=0.5)
     except serial.SerialException as se:
         print("Serial Port 0ccupied,error = ")
         print(str(se))
@@ -23,7 +33,7 @@ def serialConfig(configFileName, dataPortName, userPortName):
         cliPort.write((i+'\n').encode())
         print(i)
         time.sleep(0.01)
-
+    print("-----------------------------------------------------------------------")
     return cliPort,dataPort
 
 def parseConfigFile(configFileName):
@@ -273,14 +283,46 @@ def update():
         x = -detObj["x"]
         y = detObj["y"]
 
-        s.setData(x, y)
-        QtGui.QApplication.processEvents()
+        # s.setData(x, y)
+        # QtGui.QApplication.processEvents()
 
     return dataOk
 
-
+def processData(dataBin):
+    # Alter to 4-byte data in array form 1 byte/element
+    # breathFFT = dataBin[52:56]
+    # breathFFT = breathFFT[::-1]
+    # heartFFT = dataBin[56:60]
+    # heartFFT = heartFFT[::-1]
+    #
+    # # Remove b value in hex
+    # breathFFT = [s.hex() for s in breathFFT]
+    # heartFFT = [s.hex() for s in heartFFT]
+    #
+    # # Join arrays together to form 4 byte value
+    # breathFFT = float.fromhex("".join(breathFFT))
+    # heartFFT = float.fromhex("".join(heartFFT))
+    headerLength = 36
+    try:
+        magic, version, length, platform, frameNum, cpuCycles, numObj, numTLVs = struct.unpack('Q7I',
+                                                                                               dataBin[:headerLength])
+        # print(frameNum)
+    except:
+        return
+        # print("Improper TLV structure found: ", (dataBin,))
+    # print("Packet ID:\t%d " % (frameNum))
+    # print("Version:\t%x " % (version))
+    # print("TLV:\t\t%d " % (numTLVs))
+    # print("Detect Obj:\t%d " % (numObj))
+    # print("Platform:\t%X " % (platform))
+    return
+def readAndParseData(dataBin,Dataport):
+    readBuffer = Dataport.readline().strip()
+    dataBin=readBuffer[readBuffer.find(magicWord):]
+    # dataBin=int.from_bytes(readBuffer, byteorder='big')
+    return dataBin
 def main():
-    configFileName = "./6843_pplcount_debug.cfg"
+    configFileName = "./xwr1642_profile_VitalSigns_20fps_Front.cfg"
     dataPortName = "COM22"
     userPortName = "COM12"
     #
@@ -289,49 +331,58 @@ def main():
 
 
     # Configurate the serial port
-    global CLIport, Dataport
     CLIport, Dataport = serialConfig(configFileName, dataPortName, userPortName)
+    try:
+        while True:
+            while Dataport.in_waiting:
+                print(readAndParseData(dataBin,Dataport))
+                # processData(readAndParseData(dataBin,Dataport))
 
+    except KeyboardInterrupt:
+            Dataport.close()  # 清除序列通訊物件
+            CLIport.write(('sensorStop\n').encode())
+            CLIport.close()
+            print('再見！')
     # Get the configuration parameters from the configuration file
     configParameters = parseConfigFile(configFileName)
 
-    # START QtAPPfor the plot
-    app = QtGui.QApplication([])
+    # # START QtAPPfor the plot
+    # app = QtGui.QApplication([])
+    #
+    # # Set the plot
+    # pg.setConfigOption('background', 'w')
+    # win = pg.GraphicsWindow(title="2D scatter plot")
+    # p = win.addPlot()
+    # p.setXRange(-0.5, 0.5)
+    # p.setYRange(0, 1.5)
+    # p.setLabel('left', text='Y position (m)')
+    # p.setLabel('bottom', text='X position (m)')
+    # global s
+    # s= p.plot([], [], pen=None, symbol='o')
 
-    # Set the plot
-    pg.setConfigOption('background', 'w')
-    win = pg.GraphicsWindow(title="2D scatter plot")
-    p = win.addPlot()
-    p.setXRange(-0.5, 0.5)
-    p.setYRange(0, 1.5)
-    p.setLabel('left', text='Y position (m)')
-    p.setLabel('bottom', text='X position (m)')
-    global s
-    s= p.plot([], [], pen=None, symbol='o')
-
-    # Main loop
-    detObj = {}
-    frameData = {}
-    currentIndex = 0
-    while True:
-        try:
-            # Update the data and check if the data is okay
-            dataOk = update()
-
-            if dataOk:
-                # Store the current frame into frameData
-                frameData[currentIndex] = detObj
-                currentIndex += 1
-
-            time.sleep(0.033)  # Sampling frequency of 30 Hz
-
-        # Stop the program and close everything if Ctrl + c is pressed
-        except KeyboardInterrupt:
-            CLIport.write(('sensorStop\n').encode())
-            CLIport.close()
-            Dataport.close()
-            win.close()
-            break
+    # # Main loop
+    # detObj = {}
+    # frameData = {}
+    # currentIndex = 0
+    # while True:
+    #     try:
+    #         # Update the data and check if the data is okay
+    #         dataOk = update()
+    #
+    #         if dataOk:
+    #             # Store the current frame into frameData
+    #             frameData[currentIndex] = detObj
+    #             currentIndex += 1
+    #             print(detObj)
+    #         time.sleep(0.033)  # Sampling frequency of 30 Hz
+    #
+    #     # Stop the program and close everything if Ctrl + c is pressed
+    #     except KeyboardInterrupt:
+    #         CLIport.write(('sensorStop\n').encode())
+    #         CLIport.close()
+    #         Dataport.close()
+    #         win.close()
+    #         break
     #
 
 
