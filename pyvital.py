@@ -2,13 +2,14 @@ import serial
 import time
 import numpy as np
 import struct
-import xlrd,xlwt
+import xlwt
 import sys
 sys.path.append('C:\\Users\\asd78\\PycharmProjects\\Pyvital-sign')
 from LABEL import Ui_MainWindow
-from PyQt5 import QtCore, QtGui, QtWidgets
-
+from PyQt5 import QtWidgets
+import os
 global CLIport, Dataport
+import subprocess
 CLIport = {}
 Dataport = {}
 byteBuffer = np.zeros(2**15,dtype = 'uint8')
@@ -98,13 +99,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def demo(self):
         # configFileName = "./6843_pplcount_debug.cfg"
-        configFileName = "./xwr1642_profile_VitalSigns_20fps_Front.cfg"
+        configFileName = "C:\\Users\\asd78\\PycharmProjects\\Pyvital-sign\\xwr1642_profile_VitalSigns_20fps_Front.cfg"
         dataPortName = "COM22"
         userPortName = "COM12"
 
 
         # # Configurate the serial port
         CLIport, Dataport = MainWindow.serialConfig(configFileName, dataPortName, userPortName)
+        savename="vital"
+        if os.path.isfile("./{}".format(savename)):
+            savename="vital"
         drawh_y=np.zeros([50])
         drawb_y = np.zeros([50])
         draw_x=range(1,51)
@@ -113,6 +117,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.graphicsView.setYRange(0,40,padding=0)
         self.ui.graphicsView_2.setYRange(0,250,padding=0)
         frame_count=0
+
+        subprocess.call("start D:\demo_movie\do_run_movie", shell=True)
+        # os.system("D:\demo_movie\do_run_movie")
+
         while True:
             try:
                 # ---------------------------------------vital sign---------------------------------------------------------------------
@@ -127,7 +135,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         sheet.write(numframe, 0, numframe)
                         sheet.write(numframe, 1, round(fBlist))
                         sheet.write(numframe, 2, round(fHlist))
-                        self.book.save(r'.\test.xls')
+                        self.book.save(r'.\{}.xls'.format(savename))
 
 
                         # print("frames:{}, h:{}, b:{}".format(numframe,round(fHlist),round(fBlist)))
@@ -154,8 +162,8 @@ class MainWindow(QtWidgets.QMainWindow):
                         if numframe % 1 == 0:
                             self.ui.graphicsView.clear()
                             self.ui.graphicsView_2.clear()
-                            self.ui.graphicsView.plot(draw_x, drawb_y,color='r')
-                            self.ui.graphicsView_2.plot(draw_x, drawh_y,color='r')
+                            self.ui.graphicsView.plot(draw_x, drawb_y)
+                            self.ui.graphicsView_2.plot(draw_x, drawh_y)
 
                             # print("f:{},sum:{},b:{},last:{}".format(numframe,sum(drawb_y[90:99]),fBlist,drawb_y[99]))
 
@@ -169,7 +177,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 Dataport.close()  # 清除序列通訊物件
                 CLIport.write(('sensorStop\n').encode())
                 CLIport.close()
-                self.book.save(r'.\test.xls')
+                self.book.save(r'.\{}.xls'.format(savename))
                 print('再見！')
 
 
