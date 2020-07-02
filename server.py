@@ -17,34 +17,46 @@ byteBufferLength = 0
 dataBin = [None] * 288
 magicWord = [2, 1, 4, 3, 6, 5, 8, 7]
 
-input_1 = np.zeros([12, 120, 50])
-input_2 = np.zeros([12, 50, 120])
-input_3 = np.zeros([12, 120, 120])
+input_1 = np.zeros([12, 50, 30])
+input_2 = np.zeros([12, 30, 50])
+input_3 = np.zeros([12, 50, 50])
 
 configFileName = "./6843_pplcount_debug.cfg"
 dataPortName = "COM22"
 userPortName = "COM12"
 
 
-#server init
-port = 5080
-server_socket = socket.socket()
-server_socket.bind(("", port))
-server_socket.listen(2)
-print("waiting client:")
-conn, address = server_socket.accept()
-print("Connection from: ", str(address))
-print("connect successful!!")
-time.sleep(3)
+# #server init
+# port = 5080
+# server_socket = socket.socket()
+# server_socket.bind(("192.168.210.11", port))
+# server_socket.listen(2)
+# print("waiting client:")
+# conn, address = server_socket.accept()
+# print("Connection from: ", str(address))
+# print("connect successful!!")
+# for i in range(3):
+#     print("time to start : {} !".format(3-i))
+#     time.sleep(1)
 
 # print("Socket now lisening!")
 # ------------------------------------------------------------------
+class CustomEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        else:
+            return super(CustomEncoder, self).default(obj)
 
 
 def serialConfig(configFileName, dataPortName, userPortName):
     try:
         cliPort = serial.Serial(userPortName, 115200)
-        dataPort = serial.Serial(dataPortName, 921600, timeout=0.1)
+        dataPort = serial.Serial(dataPortName, 921600, timeout=0.08)
     except serial.SerialException as se:
         print("Serial Port 0ccupied,error = ")
         print(str(se))
@@ -59,8 +71,7 @@ def serialConfig(configFileName, dataPortName, userPortName):
     print('---------------------------已啟動雷達！---------------------------------')
     return cliPort, dataPort
 
-# # Configurate the serial port
-CLIport, Dataport = serialConfig(configFileName, dataPortName, userPortName)
+
 
 
 # 定義空間
@@ -79,18 +90,14 @@ def voxalize(x_points, y_points, z_points, x, y, z):
     z_res = (z_max - z_min) / z_points
     y_res = (y_max - y_min) / y_points
     x_res = (x_max - x_min) / x_points
-    # if z_min == z_max:
-    #     z_res = 1
-    # if y_min == y_max:
-    #     y_res = 1
-    # if x_min == x_max:
-    #     x_res = 1
 
     #     新方法求取矩陣點
 
     pixel_x_y = np.zeros([x_points * y_points])
     pixel_y_z = np.zeros([z_points * y_points])
     pixel_x_z = np.zeros([x_points * z_points])
+
+
 
     for i in range(len(y)):
 
@@ -177,9 +184,9 @@ def readAndParseData(Dataport):
             z = np.multiply(range_list[:], np.sin(elevation_list))
             # print("x:",len(x),"y:",len(y),"z:",len(z))
 
-            p_x_y, p_y_z, p_z_x = voxalize(120, 50, 120, x, y, z)
+            p_x_y, p_y_z, p_z_x = voxalize(50, 30, 50, x, y, z)
             isnull = 0
-        return subFrameNum, p_x_y, p_y_z, p_z_x, isnull
+        return subFrameNum, p_x_y, p_y_z, p_z_x, isnull,x,y,z
 
     else:
         subFrameNum = []
@@ -187,25 +194,23 @@ def readAndParseData(Dataport):
         y = []
         z = []
         isnull = 1
-        return subFrameNum, x, y, z, isnull
+        return subFrameNum, x, y, z, isnull,[],[],[]
 
     # ----------------------------------------------------------------------------------------------------------------------
 
 
 def stack_data(frames, x, y, z):
-    x = np.reshape(x, (120, 50))
-    y = np.reshape(y, (50, 120))
-    z = np.reshape(z, (120, 120))
+
+    x = np.reshape(x, (50, 30))
+    y = np.reshape(y, (30, 50))
+    z = np.reshape(z, (50, 50))
     # print(input_1.size())
     if frames < 12:
         input_1[frames, :, :] = x
         input_2[frames, :, :] = y
         input_3[frames, :, :] = z
 
-        # print("frames: ",frames+1)
-        # # print("x: ",np.sum(x),"y: ",np.sum(y),"z: ",np.sum(z))
-        #
-        # print("xy: ",np.sum(input_1),"y_z: ",np.sum(input_2),"z_x: ",np.sum(input_3))
+
     else:
         input_1[0:11, :, :] = input_1[1:12, :, :]
         input_1[11, :, :] = x
@@ -216,65 +221,90 @@ def stack_data(frames, x, y, z):
 
 
 
-        # print("frames: ", frames + 1)
-        # print("xy: ",np.sum(input_1),"y_z: ",np.sum(input_2),"z_x: ",np.sum(input_3))
+    i1 = input_1.flatten()
+    i2 = input_2.flatten()
+    i3 = input_3.flatten()
 
-        # N_input_1 = np.reshape(input_1, (1, 12, 120, 50, 1))
-        # N_input_2 = np.reshape(input_2, (1, 12, 50, 120, 1))
-        # N_input_3 = np.reshape(input_3, (1, 12, 120, 120, 1))
-
-
-        # print("x: ", np.sum(x), "y: ", np.sum(y), "z: ", np.sum(z))
-    ix = np.sum(input_1)
-    iy = np.sum(input_2)
-    iz = np.sum(input_3)
-    # print("frames: ",frames,"x: ",ix,"y: ",iy,"z: ",iz)
-
-    return ix,iy,iz
+    return i1,i2,i3
 
 # ----------------------------------------------------------------------------------------------------------------------
-def transfer_data_from_queue(q):
 
-    while True:
-        data = q.get()
-        try:
-            if data !=[]:
-                conn.send((str(data) + "\n").encode())
-        except:
-            Dataport.close()  # 清除序列通訊物件
-            CLIport.write(('sensorStop\n').encode())
-            CLIport.close()
-            conn.close()
-            print('---------------------------已中斷連線！----------------------------------')
-            break
+def initSocket():
+    # server init
+    port = 5000
+    server_socket = socket.socket()
+    server_socket.bind(("192.168.210.105", port))# router ip,costum port
+    server_socket.listen(2)
+    try:
+        print("waiting client:")
+        conn, address = server_socket.accept()
+    except KeyboardInterrupt:
+        sys.exit()
+    print("Connection from: ", str(address))
+    print("connect successful!!")
+    for i in range(3):
+        print("time to start : {} !".format(3 - i))
+        time.sleep(1)
+    return conn
+
+def demo():
+    conn = initSocket()
+    with conn:
+        # # Configurate the serial port
+        CLIport, Dataport = serialConfig(configFileName, dataPortName, userPortName)
+        while True:
+                try:
+                    numframes, x, y, z, isnull ,px,py,pz= readAndParseData(Dataport)
+                    # print(px)
+                    #no null data
+                    # print(isnull)
+                    if isnull == 0:
+                        i1,i2,i3 = stack_data(numframes, x, y, z)
+
+                        data = {'numframes': numframes, 'x': np.sum(i1), 'y': np.sum(i2), 'z': np.sum(i3)}
+                        data = json.dumps(data)
+                        # print(i1)
+
+                        conn.send(("UI DATA\n{}\n".format(str(data))).encode())
+                        conn.send(("input\n").encode())
+
+                        conn.send(struct.pack('!i',len(i1)))
+                        conn.send(struct.pack('!{}f'.format(len(i1)),*i1))
+
+                        conn.send(struct.pack('!i',len(i2)))
+                        conn.send(struct.pack('!{}f'.format(len(i2)),*i2))
+
+                        conn.send(("test\n").encode())
+                        conn.send(struct.pack('!i',len(px)))
+                        conn.send(struct.pack('!{}f'.format(len(px)),*px))
+                        conn.send(struct.pack('!i', len(py)))
+                        conn.send(struct.pack('!{}f'.format(len(py)),*py))
+                        conn.send(struct.pack('!i', len(pz)))
+                        conn.send(struct.pack('!{}f'.format(len(pz)),*pz))
+
+                        # conn.send(struct.pack('!i',len(i3)))
+                        # conn.send(struct.pack('!{}f'.format(len(i3)),*i3))
+                        print("num:{}".format(numframes))
+                        # print("num:{},i1:{},i2:{},i3:{}".format(numframes,len(i1),len(i2),len(i3)))
+                    else:
+                        continue
+                    time.sleep(0.08)  # Sampling frequency of 30 Hz
+                except socket.error as msg:
+                    print(msg)
+                    conn = initSocket()
+                except KeyboardInterrupt:
+                    Dataport.close()  # 清除序列通訊物件
+                    CLIport.write(('sensorStop\n').encode())
+                    CLIport.close()
+                    print('---------------------------已中斷連線！----------------------------------')
+                    break
 
 
-def demo(q):
-    while True:
-        try:
-            numframes, x, y, z, isnull = readAndParseData(Dataport)
 
-            #no null data
-            # print(isnull)
-            if isnull == 0:
-                ix,iy,iz = stack_data(numframes, x, y, z)
-                data = {'numframes': numframes, 'x': ix, 'y': iy, 'z': iz}
-                data = json.dumps(data)
-                q.put(data)
-                # print(data)
-            # else:
-            #     continue
-            # time.sleep(0.1)  # Sampling frequency of 30 Hz
-        except:
-            continue
 
 
 def main():
-    q = mp.Queue()
-    p1 = threading.Thread(target=demo, args=(q,))
-    p2 = threading.Thread(target=transfer_data_from_queue, args=(q,))
-    p2.start()
-    p1.start()
+    demo()
 
 if __name__ == "__main__":
     main()
