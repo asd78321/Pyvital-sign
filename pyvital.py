@@ -4,6 +4,7 @@ import numpy as np
 import struct
 import xlwt
 import sys
+import math
 
 sys.path.append('C:\\Users\\70639wimoc\\PycharmProjects\\Pyvital-sign')
 from LABEL import Ui_MainWindow
@@ -55,6 +56,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Constants
         magicWord = [2, 1, 4, 3, 6, 5, 8, 7]
 
+        init_UnwrapPhasePeak = 0
         readBuffer = Dataport.read(Dataport.in_waiting)
         byteVec = np.frombuffer(readBuffer, dtype='uint8')
         framedata = []
@@ -63,32 +65,43 @@ class MainWindow(QtWidgets.QMainWindow):
         if np.all(byteVec[0:8] == magicWord):
             pack_length = 288
             header_length = 48
+
             if len(readBuffer) % pack_length == 0:
                 Blist = []
                 Hlist = []
-                BNlist=[]
-                HNlist=[]
+                BNlist = []
+                HNlist = []
+                Phlist = []
                 numframes = []
                 for i in range(len(readBuffer) // pack_length):
                     subFrameNum = struct.unpack('I', readBuffer[i * pack_length + 20:i * pack_length + 24])[0]
                     # Tlvtype = struct.unpack('I',readBuffer[i*288+40:i*288+44])[0]
                     # Tlvlen = struct.unpack('I',readBuffer[i*288+44:i*288+48])[0]
-                    sumEnergyBreath = struct.unpack('f', readBuffer[i * pack_length +header_length+76:i * pack_length + header_length +80])[0]
-                    sumEnergyHeart = struct.unpack('f', readBuffer[i * pack_length +header_length + 80:i * pack_length + header_length + 84])[0]
+                    unwrapPhasePeak_mm = struct.unpack('f', readBuffer[
+                                                            i * pack_length + header_length + 16:i * pack_length + header_length + 20])[
+                        0]
+                    sumEnergyBreath = struct.unpack('f', readBuffer[
+                                                         i * pack_length + header_length + 76:i * pack_length + header_length + 80])[
+                        0]
+                    sumEnergyHeart = struct.unpack('f', readBuffer[
+                                                        i * pack_length + header_length + 80:i * pack_length + header_length + 84])[
+                        0]
                     BreathEst_FFT = struct.unpack('f', readBuffer[i * pack_length + 48 + 44:i * pack_length + 48 + 48])[
                         0]  # 40:frameHeader and 8:type/len bytes 288:maxPacketlen
                     HeartEst_FFT = struct.unpack('f', readBuffer[i * 288 + 48 + 28:i * 288 + 48 + 32])[0]
+
                     # print("numFrame: ",subFrameNum,"Breath: ",round(BreathEst_FFT),'s/min',"Heart: ",round(HeartEst_FFT),'s/min')
+                    Phlist.append(unwrapPhasePeak_mm)
                     Blist.append(BreathEst_FFT)
                     Hlist.append(HeartEst_FFT)
                     BNlist.append(sumEnergyBreath)
                     HNlist.append(sumEnergyHeart)
                     numframes.append(subFrameNum)
                 isnull = 0
-                return Blist, Hlist, BNlist, HNlist,numframes, isnull
+                return Blist, Hlist, BNlist, HNlist, numframes, Phlist, isnull
         else:
             isnull = 1
-            return [], [], [],[],[],isnull
+            return [], [], [], [], [], [],isnull
 
     def saveData(self):
         book = xlwt.Workbook(encoding='utf-8', style_compression=0)
@@ -100,7 +113,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.sheet.write(0, 2, 'HeartRate')
         self.sheet.write(0, 3, 'EnergyBreath')
         self.sheet.write(0, 4, 'EnergyHeart')
-        self.sheet.write(0,5,'time')
+        self.sheet.write(0, 5, 'ChestMovement')
+        self.sheet.write(0, 6, 'time')
 
         return self.sheet
 
@@ -131,26 +145,45 @@ class MainWindow(QtWidgets.QMainWindow):
         # subprocess.call("start D:\demo_movie\do_run_movie", shell=True)
         # os.system("D:\demo_movie\do_run_movie")
 
+        # constants
+        exPhase = 0
+        c = 3 * 10 ** 8
+        f = 79 * 10 ** 9
+
+        Wavelength = c / f
         while True:
             try:
                 # ---------------------------------------vital sign---------------------------------------------------------------------
-                Blist, Hlist, BNlist, HNlist, numframes, isnull = MainWindow.readAndParseData(Dataport)
+                Blist, Hlist, BNlist, HNlist, numframes, PHlist, isnull = MainWindow.readAndParseData(Dataport)
+
                 # print(isnull)
                 if isnull == 0 and numframes != []:
                     for i in range(len(numframes)):
                         numframe = numframes[i]
                         fHlist = Hlist[i]
                         fBlist = Blist[i]
-                        fHNlist =HNlist[i]
-                        fBNlist= BNlist[i]
+                        fHNlist = HNlist[i]
+                        fBNlist = BNlist[i]
+
+                        fPHlist = PHlist[i]
+                        chestmovement = ((PHlist[i] - exPhase) / (4 * math.pi)) / Wavelength
+                        exPhase = PHlist[i]
+
                         write_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
                         sheet.write(numframe, 0, numframe)
                         sheet.write(numframe, 1, round(fBlist))
                         sheet.write(numframe, 2, round(fHlist))
-                        sheet.write(numframe,3,fBNlist)
-                        sheet.write(numframe,4,fHNlist)
-                        sheet.write(numframe,5,write_time)
+                        sheet.write(numframe, 3, fBNlist)
+                        sheet.write(numframe, 4, fHNlist)
+                        sheet.write(numframe, 5, chestmovement)
+                        sheet.write(numframe, 6, write_time)
 
+                        if numframe ==60:
+                            os.system("start C:\\Users\\70639wimoc\PycharmProjects\Pyvital-sign\soundeffect\\rivier_20s.mp3")
+                        if numframe ==260:
+                            os.system("start C:\\Users\\70639wimoc\PycharmProjects\Pyvital-sign\soundeffect\whistle.mp3")
+                        if numframe == 310:
+                            break
                         self.book.save(r'.\{}.xls'.format(savename))
 
                         # print("frames:{}, h:{}, b:{}".format(numframe,round(fHlist),round(fBlist)))
