@@ -6,7 +6,7 @@ import xlwt
 import sys
 import math
 
-sys.path.append('C:\\Users\\70639wimoc\\PycharmProjects\\Pyvital-sign')
+sys.path.append('C:\\Users\\asd78\\PycharmProjects\\Pyvital-sign\\LABEL.py')
 from LABEL import Ui_MainWindow
 from PyQt5 import QtWidgets
 import os
@@ -36,7 +36,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def serialConfig(configFileName, dataPortName, userPortName):
         try:
             cliPort = serial.Serial(userPortName, 115200)
-            dataPort = serial.Serial(dataPortName, 921600, timeout=0.04)
+            dataPort = serial.Serial(dataPortName, 921600, timeout=0.05)
         except serial.SerialException as se:
             print("Serial Port 0ccupied,error = ")
             print(str(se))
@@ -123,9 +123,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def demo(self):
         # configFileName = "./6843_pplcount_debug.cfg"
-        configFileName = "C:\\Users\\70639wimoc\\PycharmProjects\\Pyvital-sign\\xwr1642_profile_VitalSigns_20fps_Front.cfg"
-        dataPortName = "COM5"
-        userPortName = "COM10"
+        configFileName = "C:\\Users\\asd78\\PycharmProjects\\Pyvital-sign\\xwr1642_profile_VitalSigns_20fps_Front.cfg"
+        dataPortName = "COM22"
+        userPortName = "COM12"
 
         # # Configurate the serial port
         CLIport, Dataport = MainWindow.serialConfig(configFileName, dataPortName, userPortName)
@@ -150,9 +150,11 @@ class MainWindow(QtWidgets.QMainWindow):
         c = 3 * 10 ** 8
         f = 79 * 10 ** 9
 
+        trailer_time = 20 * (2*60 + 50)
         Wavelength = c / f
         while True:
             try:
+                time.sleep(0.05)  # Sampling frequency of 250 Hz
                 # ---------------------------------------vital sign---------------------------------------------------------------------
                 Blist, Hlist, BNlist, HNlist, numframes, PHlist, isnull = MainWindow.readAndParseData(Dataport)
 
@@ -178,12 +180,12 @@ class MainWindow(QtWidgets.QMainWindow):
                         sheet.write(numframe, 5, chestmovement)
                         sheet.write(numframe, 6, write_time)
 
-                        if numframe ==60:
-                            os.system("start C:\\Users\\70639wimoc\PycharmProjects\Pyvital-sign\soundeffect\\rivier_20s.mp3")
-                        if numframe ==260:
-                            os.system("start C:\\Users\\70639wimoc\PycharmProjects\Pyvital-sign\soundeffect\whistle.mp3")
-                        if numframe == 310:
-                            break
+
+                        # if numframe == 200:
+                        #     os.system("start C:\\Users\\asd78\\PycharmProjects\\Pyvital-sign\\soundeffect\\rivier_20s.mp3")
+                        # if numframe ==450:
+                        #     os.system("start C:\\Users\\asd78\\PycharmProjects\\Pyvital-sign\\soundeffect\\whistle.mp3")
+
                         self.book.save(r'.\{}.xls'.format(savename))
 
                         # print("frames:{}, h:{}, b:{}".format(numframe,round(fHlist),round(fBlist)))
@@ -217,15 +219,21 @@ class MainWindow(QtWidgets.QMainWindow):
 
                         app.processEvents()
 
-                        # time.sleep(0.1)  # Sampling frequency of 30 Hz
+                        if numframe == 80 + trailer_time:
+                            Dataport.close()  # 清除序列通訊物件
+                            CLIport.write(('sensorStop\n').encode())
+                            CLIport.close()
+                            print("'sensorStop\n'")
+                            app.closeAllWindows()
+                            break
+
                 else:
                     continue
-            except KeyboardInterrupt:
-                Dataport.close()  # 清除序列通訊物件
-                CLIport.write(('sensorStop\n').encode())
-                CLIport.close()
-                self.book.save(r'.\{}.xls'.format(savename))
-                print('再見！')
+            except:
+                print("Unexpected error:", sys.exc_info()[0])
+                continue
+
+
 
 
 if __name__ == "__main__":
