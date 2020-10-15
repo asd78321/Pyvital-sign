@@ -1,4 +1,5 @@
-import serial
+import serial  # pyserial 3.4
+import os
 import time
 import numpy as np
 import struct
@@ -6,10 +7,9 @@ import xlwt
 import sys
 import math
 
-sys.path.append('C:\\Users\\asd78\\PycharmProjects\\Pyvital-sign\\LABEL.py')
+sys.path.append('{}\\LABEL.py'.format(os.getcwd))
 from LABEL import Ui_MainWindow
 from PyQt5 import QtWidgets
-import os
 
 global CLIport, Dataport
 import subprocess
@@ -74,21 +74,20 @@ class MainWindow(QtWidgets.QMainWindow):
                 Phlist = []
                 numframes = []
                 for i in range(len(readBuffer) // pack_length):
-                    subFrameNum = struct.unpack('I', readBuffer[i * pack_length + 20:i * pack_length + 24])[0]
-                    # Tlvtype = struct.unpack('I',readBuffer[i*288+40:i*288+44])[0]
-                    # Tlvlen = struct.unpack('I',readBuffer[i*288+44:i*288+48])[0]
+                    subFrameNum = struct.unpack('I', readBuffer[i * pack_length + 20:i * pack_length + 24])[0] # Header(40)
+
                     unwrapPhasePeak_mm = struct.unpack('f', readBuffer[
                                                             i * pack_length + header_length + 16:i * pack_length + header_length + 20])[
-                        0]
+                        0]  # count(0~) * pack_length(288) + header_length(Packet_Header:40 + TLV Header:8)
                     sumEnergyBreath = struct.unpack('f', readBuffer[
                                                          i * pack_length + header_length + 76:i * pack_length + header_length + 80])[
                         0]
                     sumEnergyHeart = struct.unpack('f', readBuffer[
                                                         i * pack_length + header_length + 80:i * pack_length + header_length + 84])[
                         0]
-                    BreathEst_FFT = struct.unpack('f', readBuffer[i * pack_length + 48 + 44:i * pack_length + 48 + 48])[
+                    BreathEst_FFT = struct.unpack('f', readBuffer[i * pack_length + header_length + 44:i * pack_length + header_length + 48])[
                         0]  # 40:frameHeader and 8:type/len bytes 288:maxPacketlen
-                    HeartEst_FFT = struct.unpack('f', readBuffer[i * 288 + 48 + 28:i * 288 + 48 + 32])[0]
+                    HeartEst_FFT = struct.unpack('f', readBuffer[i * pack_length + header_length + 28:i * pack_length + header_length + 32])[0]
 
                     # print("numFrame: ",subFrameNum,"Breath: ",round(BreathEst_FFT),'s/min',"Heart: ",round(HeartEst_FFT),'s/min')
                     Phlist.append(unwrapPhasePeak_mm)
@@ -97,11 +96,12 @@ class MainWindow(QtWidgets.QMainWindow):
                     BNlist.append(sumEnergyBreath)
                     HNlist.append(sumEnergyHeart)
                     numframes.append(subFrameNum)
+
                 isnull = 0
                 return Blist, Hlist, BNlist, HNlist, numframes, Phlist, isnull
         else:
             isnull = 1
-            return [], [], [], [], [], [],isnull
+            return [], [], [], [], [], [], isnull
 
     def saveData(self):
         book = xlwt.Workbook(encoding='utf-8', style_compression=0)
@@ -123,9 +123,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def demo(self):
         # configFileName = "./6843_pplcount_debug.cfg"
-        configFileName = "C:\\Users\\asd78\\PycharmProjects\\Pyvital-sign\\xwr1642_profile_VitalSigns_20fps_Front.cfg"
-        dataPortName = "COM22"
-        userPortName = "COM12"
+        configFileName = "{}\\xwr1642_profile_VitalSigns_20fps_Front.cfg".format(os.getcwd())
+        dataPortName = "COM5"
+        userPortName = "COM10"
 
         # # Configurate the serial port
         CLIport, Dataport = MainWindow.serialConfig(configFileName, dataPortName, userPortName)
@@ -150,7 +150,7 @@ class MainWindow(QtWidgets.QMainWindow):
         c = 3 * 10 ** 8
         f = 79 * 10 ** 9
 
-        trailer_time = 20 * (2*60 + 50)
+        trailer_time = 3920
         Wavelength = c / f
         while True:
             try:
@@ -179,7 +179,6 @@ class MainWindow(QtWidgets.QMainWindow):
                         sheet.write(numframe, 4, fHNlist)
                         sheet.write(numframe, 5, chestmovement)
                         sheet.write(numframe, 6, write_time)
-
 
                         # if numframe == 200:
                         #     os.system("start C:\\Users\\asd78\\PycharmProjects\\Pyvital-sign\\soundeffect\\rivier_20s.mp3")
@@ -226,14 +225,15 @@ class MainWindow(QtWidgets.QMainWindow):
                             print("'sensorStop\n'")
                             app.closeAllWindows()
                             break
+                            sys.exit()
 
                 else:
                     continue
             except:
-                print("Unexpected error:", sys.exc_info()[0])
+                Dataport.read(Dataport.in_waiting)
+                print("Frames:{} Unexpected error:{} bufferlength:{},".format(numframe, sys.exc_info()[0],
+                                                                              len(Dataport.read(Dataport.in_waiting))))
                 continue
-
-
 
 
 if __name__ == "__main__":
