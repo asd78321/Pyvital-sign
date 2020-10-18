@@ -7,7 +7,8 @@ import xlwt
 import sys
 import math
 
-sys.path.append('{}\\LABEL.py'.format(os.getcwd))
+#sys.path.append('{}\\LABEL.py'.format(os.getcwd))
+sys.path.append('C:\\Users\\70639wimoc\\PycharmProjects\\Pyvital-sign')
 from LABEL import Ui_MainWindow
 from PyQt5 import QtWidgets
 
@@ -22,16 +23,30 @@ dataBin = [None] * 288
 magicWord = [2, 1, 4, 3, 6, 5, 8, 7]
 
 
+
 # ------------------------------------------------------------------
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
+
         super(MainWindow, self).__init__()
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.ui.pushButton.toggle()
+        self.ui.pushButton.clicked.connect(lambda :self.exitUI())
+        self.ui.pushButton_2.toggle()
+        self.ui.pushButton_2.clicked.connect(lambda :self.do_run_movie())
         self.show()
         MainWindow.demo(self)
 
         # self.ui.label.setText('Hello World!')
+    def exitUI(self):
+        self.book.save(r'.\vital.xls')
+        app.closeAllWindows()
+        sys.exit()
+    def do_run_movie(self):
+
+        # Call ssi script(Openface) in sub-terminal
+        subprocess.call("start C:\\Users\\70639wimoc\\Desktop\\demo_movie-ori\\demo_movie-ori\\do_run_movie", shell=True)
 
     def serialConfig(configFileName, dataPortName, userPortName):
         try:
@@ -118,12 +133,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
         return self.sheet
 
-    def exit_ui(self):
-        self.book.save(r'.\test.xls')
 
     def demo(self):
         # configFileName = "./6843_pplcount_debug.cfg"
-        configFileName = "{}\\xwr1642_profile_VitalSigns_20fps_Front.cfg".format(os.getcwd())
+        configFileName = "{}\\xwr1642_profile_VitalSigns_20fps_Front.cfg".format("C:\\Users\\70639wimoc\\PycharmProjects\\Pyvital-sign")
         dataPortName = "COM5"
         userPortName = "COM10"
 
@@ -194,14 +207,7 @@ class MainWindow(QtWidgets.QMainWindow):
                         self.ui.lcdNumber_2.display(round(fBlist))
                         self.ui.lcdNumber_3.setDigitCount(len(str(numframe)))
                         self.ui.lcdNumber_3.display(numframe)
-                        # if numframe<=100:
-                        #     drawb_y[numframe - 1] = fBlist
-                        #     drawh_y[numframe - 1] = fHlist
-                        # else:
-                        #     drawb_y[0:98] = drawb_y[1:99]
-                        #     drawh_y[0:98] = drawh_y[1:99]
-                        #     drawb_y[99] = fBlist
-                        #     drawh_y[99] = fHlist
+
                         if numframe % 50 == 0:
                             count = 50
                         else:
@@ -218,14 +224,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
                         app.processEvents()
 
-                        if numframe == 80 + trailer_time:
-                            Dataport.close()  # 清除序列通訊物件
-                            CLIport.write(('sensorStop\n').encode())
-                            CLIport.close()
-                            print("'sensorStop\n'")
-                            app.closeAllWindows()
-                            break
-                            sys.exit()
+                        # if numframe == 80 + trailer_time:
+                        #     Dataport.close()  # 清除序列通訊物件
+                        #     CLIport.write(('sensorStop\n').encode())
+                        #     CLIport.close()
+                        #     print("'sensorStop\n'")
+                        #     app.closeAllWindows()
+                        #     break
+                        #     sys.exit()
 
                 else:
                     continue
