@@ -40,13 +40,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # self.ui.label.setText('Hello World!')
     def exitUI(self):
-        self.book.save(r'.\vital.xls')
+        # print("'sensorStop\n'")
+        movie = os.environ['moviename']
+        user = os.environ['username']
+        self.book.save(f'C:\\Users\\70639wimoc\\PycharmProjects\\Pyvital-sign\\results\{movie}_{user}.xls')
         app.closeAllWindows()
         sys.exit()
     def do_run_movie(self):
-
         # Call ssi script(Openface) in sub-terminal
         subprocess.call("start C:\\Users\\70639wimoc\\Desktop\\demo_movie-ori\\demo_movie-ori\\do_run_movie", shell=True)
+        # os.system("C:\\Users\\70639wimoc\\Desktop\\demo_movie-ori\\demo_movie-ori\\do_run_movie")
 
     def serialConfig(configFileName, dataPortName, userPortName):
         try:
